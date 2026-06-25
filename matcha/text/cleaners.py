@@ -32,6 +32,25 @@ global_phonemizer = phonemizer.backend.EspeakBackend(
     logger=critical_logger,
 )
 
+# espeak-ng has no Akan/Twi voice, but the Lingua Franca Nova ("lfn") voice maps Twi
+# orthography (incl. ɛ/ɔ and the 7-vowel system) to clean IPA drawn from the existing
+# symbol set in symbols.py. Built lazily so importing this module does not require the
+# lfn voice unless the Twi cleaners are actually used.
+_twi_phonemizer = None
+
+
+def _get_twi_phonemizer():
+    global _twi_phonemizer  # pylint: disable=global-statement
+    if _twi_phonemizer is None:
+        _twi_phonemizer = phonemizer.backend.EspeakBackend(
+            language="lfn",
+            preserve_punctuation=True,
+            with_stress=True,
+            language_switch="remove-flags",
+            logger=critical_logger,
+        )
+    return _twi_phonemizer
+
 
 # Regular expression matching whitespace:
 _whitespace_re = re.compile(r"\s+")
@@ -112,6 +131,25 @@ def english_cleaners2(text):
     phonemes = remove_brackets(phonemes)
     phonemes = collapse_whitespace(phonemes)
     return phonemes
+
+
+def twi_cleaners(text):
+    """Pipeline for Asante Twi: lowercase (keeps ɛ/ɔ intact) then phonemize to IPA
+    via the espeak-ng ``lfn`` voice. Use this when the filelist stores raw Twi text.
+    """
+    text = lowercase(text)  # str.lower() maps Ɛ->ɛ and Ɔ->ɔ correctly
+    text = collapse_whitespace(text)
+    phonemes = _get_twi_phonemizer().phonemize([text], strip=True, njobs=1)[0]
+    phonemes = remove_brackets(phonemes)
+    phonemes = collapse_whitespace(phonemes)
+    return phonemes
+
+
+def twi_phonemes(text):
+    """Pass-through cleaner for filelists that already store precomputed IPA phonemes
+    (produced offline by ``twi_cleaners``). Avoids re-running espeak every epoch.
+    """
+    return collapse_whitespace(text)
 
 
 def ipa_simplifier(text):

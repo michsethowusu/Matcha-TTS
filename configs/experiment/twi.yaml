@@ -1,0 +1,27 @@
+# @package _global_
+
+# Finetune Matcha-TTS on Asante Twi (michsethowusu/ghana-speech, Asante_Twi_twi subset),
+# initialised from the English LJSpeech checkpoint. Run via the Modal pipeline:
+#   modal run modal/twi_pipeline.py::train
+# or directly:
+#   python matcha/train.py experiment=twi finetune_ckpt=/data/pretrained/matcha_ljspeech.ckpt
+
+defaults:
+  - override /data: twi.yaml
+  - override /callbacks: twi.yaml
+
+tags: ["twi", "akan", "finetune", "lfn_phonemizer"]
+
+run_name: twi_finetune
+
+# Single-speaker Bible-read corpus; finetuning converges quickly, so validate often
+# and keep many recent checkpoints (each is pushed to HF by the checkpoint callback).
+trainer:
+  max_epochs: 500
+  check_val_every_n_epoch: 1
+
+# Train the flow-matching decoder on a random ~2s crop per step (172 = 2s at 22.05kHz/hop256,
+# divisible by 4) instead of full sequences. With clips up to 15s this is the dominant speedup
+# and is the standard Matcha efficiency setting (cf. ljspeech_min_memory.yaml).
+model:
+  out_size: 172

@@ -44,8 +44,13 @@ train: True
 # lightning chooses best weights based on the metric specified in checkpoint callback
 test: True
 
-# simply provide checkpoint path to resume training
+# simply provide checkpoint path to resume training (restores optimizer/epoch/step)
 ckpt_path: null
+
+# provide a checkpoint to finetune from: loads ONLY model weights (fresh optimizer,
+# epoch 0). Ignored when ckpt_path is set (resume takes precedence). Weights are loaded
+# non-strictly so a partially-compatible checkpoint still initialises what it can.
+finetune_ckpt: null
 
 # seed for random number generators in pytorch, numpy and python.random
 seed: 1234

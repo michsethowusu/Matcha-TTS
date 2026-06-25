@@ -17,6 +17,19 @@ from matcha.models.matcha_tts import MatchaTTS
 from matcha.text import sequence_to_text, text_to_sequence
 from matcha.utils.utils import assert_model_downloaded, get_user_data_dir, intersperse
 
+# PyTorch >=2.6 defaults torch.load(weights_only=True), which cannot unpickle Lightning
+# checkpoints used by load_from_checkpoint (CLI / ONNX export / inference). Our checkpoints
+# come from training in this repo, so force the full unpickler.
+_orig_torch_load = torch.load
+
+
+def _torch_load_full(*args, **kwargs):
+    kwargs["weights_only"] = False
+    return _orig_torch_load(*args, **kwargs)
+
+
+torch.load = _torch_load_full
+
 MATCHA_URLS = {
     "matcha_ljspeech": "https://github.com/shivammehta25/Matcha-TTS-checkpoints/releases/download/v1.0/matcha_ljspeech.ckpt",
     "matcha_vctk": "https://github.com/shivammehta25/Matcha-TTS-checkpoints/releases/download/v1.0/matcha_vctk.ckpt",

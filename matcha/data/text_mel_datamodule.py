@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
+import soundfile as sf
 import torch
 import torchaudio as ta
 from lightning import LightningDataModule
@@ -197,19 +198,29 @@ class TextMelDataset(torch.utils.data.Dataset):
         return durs
 
     def get_mel(self, filepath):
-        audio, sr = ta.load(filepath)
-        assert sr == self.sample_rate
-        mel = mel_spectrogram(
-            audio,
-            self.n_fft,
-            self.n_mels,
-            self.sample_rate,
-            self.hop_length,
-            self.win_length,
-            self.f_min,
-            self.f_max,
-            center=False,
-        ).squeeze()
+        # Prefer a precomputed raw mel (sibling "mels/<stem>.npy") to avoid reading the wav and
+        # running an FFT every step; fall back to computing it on the fly if the cache is absent.
+        fp = Path(filepath)
+        mel_path = fp.parent.parent / "mels" / (fp.stem + ".npy")
+        if mel_path.exists():
+            mel = torch.from_numpy(np.load(mel_path))
+        else:
+            # torchaudio.load now dispatches to a torchcodec backend that may be absent; load the
+            # (already 22.05 kHz mono) wav with soundfile and match ta.load's (channels, samples) layout.
+            audio_np, sr = sf.read(filepath, dtype="float32", always_2d=True)
+            audio = torch.from_numpy(audio_np.T)
+            assert sr == self.sample_rate
+            mel = mel_spectrogram(
+                audio,
+                self.n_fft,
+                self.n_mels,
+                self.sample_rate,
+                self.hop_length,
+                self.win_length,
+                self.f_min,
+                self.f_max,
+                center=False,
+            ).squeeze()
         mel = normalize(mel, self.data_parameters["mel_mean"], self.data_parameters["mel_std"])
         return mel
 

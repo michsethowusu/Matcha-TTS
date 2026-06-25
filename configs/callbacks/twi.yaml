@@ -1,0 +1,24 @@
+defaults:
+  - model_summary.yaml
+  - rich_progress_bar.yaml
+  - _self_
+
+# Like the default ModelCheckpoint, but every saved checkpoint is also pushed to the HF Hub.
+# repo_id resolves from $HF_REPO_ID (default michsethowusu/matcha-twi); token from $HF_TOKEN.
+model_checkpoint:
+  _target_: matcha.utils.hf_checkpoint.HFModelCheckpoint
+  repo_id: ${oc.env:HF_REPO_ID,michsethowusu/matcha-twi}
+  path_in_repo: checkpoints
+  private: true
+  dirpath: ${paths.output_dir}/checkpoints
+  filename: twi_{epoch:03d}
+  monitor: epoch
+  mode: max
+  verbose: false
+  save_last: true        # checkpoints/last.ckpt — always the latest, overwritten each save
+  save_top_k: 5          # keep the 5 most-recent epoch snapshots (local + mirrored on HF)
+  every_n_epochs: 1      # save + push every epoch so HF updates frequently "as we go"
+  save_weights_only: false
+  every_n_train_steps: null
+  train_time_interval: null
+  save_on_train_epoch_end: null

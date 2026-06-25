@@ -3,11 +3,27 @@ from typing import Any, Dict, List, Optional, Tuple
 import hydra
 import lightning as L
 import rootutils
+import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
 from matcha import utils
+
+# PyTorch >=2.6 defaults torch.load(weights_only=True), which cannot unpickle Lightning
+# checkpoints — this breaks both finetune-weight loading and ckpt_path resume (Lightning's own
+# loader). Every checkpoint here is produced by us or the official Matcha release, so force the
+# full unpickler globally for any torch.load call (ours and Lightning's).
+_orig_torch_load = torch.load
+
+
+def _torch_load_full(*args, **kwargs):
+    # Force (not setdefault): Lightning's resume path passes weights_only=True explicitly.
+    kwargs["weights_only"] = False
+    return _orig_torch_load(*args, **kwargs)
+
+
+torch.load = _torch_load_full
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
@@ -51,6 +67,25 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info(f"Instantiating model <{cfg.model._target_}>")  # pylint: disable=protected-access
     model: LightningModule = hydra.utils.instantiate(cfg.model)
+
+    # Finetuning: load weights only (no optimizer/epoch state) unless we are resuming a
+    # run via ckpt_path. Non-strict so a checkpoint with a different speaker setup or a
+    # few mismatched keys still initialises everything it can.
+    finetune_ckpt = cfg.get("finetune_ckpt")
+    if finetune_ckpt and not cfg.get("ckpt_path"):
+        import torch  # local import keeps module import light
+
+        log.info(f"Loading finetune weights from <{finetune_ckpt}>")
+        # weights_only=False: Lightning checkpoints hold non-tensor objects; the pretrained
+        # Matcha checkpoint is from the official trusted release.
+        state = torch.load(finetune_ckpt, map_location="cpu", weights_only=False)
+        state_dict = state.get("state_dict", state)
+        missing, unexpected = model.load_state_dict(state_dict, strict=False)
+        log.info(f"Finetune load: {len(missing)} missing, {len(unexpected)} unexpected keys")
+        if missing:
+            log.info(f"Missing keys (kept at init): {missing}")
+        if unexpected:
+            log.info(f"Unexpected keys (ignored): {unexpected}")
 
     log.info("Instantiating callbacks...")
     callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
