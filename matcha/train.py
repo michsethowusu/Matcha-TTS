@@ -80,7 +80,27 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         # Matcha checkpoint is from the official trusted release.
         state = torch.load(finetune_ckpt, map_location="cpu", weights_only=False)
         state_dict = state.get("state_dict", state)
-        missing, unexpected = model.load_state_dict(state_dict, strict=False)
+
+        # Filter out parameters whose shapes do not match the current model (e.g. when
+        # changing n_spks from 1 to N, the speaker embedding and several input convs
+        # change size). Loading only shape-compatible keys lets us warm-start from a
+        # checkpoint with a different conditioning setup.
+        model_state = model.state_dict()
+        compatible = {}
+        skipped_shapes = []
+        for k, v in state_dict.items():
+            if k in model_state:
+                if v.shape == model_state[k].shape:
+                    compatible[k] = v
+                else:
+                    skipped_shapes.append(k)
+            else:
+                compatible[k] = v
+        if skipped_shapes:
+            log.info(f"Finetune load: skipping {len(skipped_shapes)} keys due to shape mismatch")
+            log.info(f"Skipped keys: {skipped_shapes[:20]}{' ...' if len(skipped_shapes) > 20 else ''}")
+
+        missing, unexpected = model.load_state_dict(compatible, strict=False)
         log.info(f"Finetune load: {len(missing)} missing, {len(unexpected)} unexpected keys")
         if missing:
             log.info(f"Missing keys (kept at init): {missing}")

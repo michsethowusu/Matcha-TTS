@@ -1,0 +1,2 @@
+tf32:
+  _target_: matcha.utils.tf32_callback.TF32Callback

@@ -1,0 +1,26 @@
+# @package _global_
+
+# Finetune Matcha-TTS on ghananlpcommunity/new-twi-tts-aligned,
+# initialised from a previously finetuned Twi checkpoint.
+# Run on the H200 with early stopping (patience=5).
+#
+# Example:
+#   python matcha/train.py experiment=twi_new finetune_ckpt=/path/to/twi_045.ckpt
+
+defaults:
+  - override /data: twi_new.yaml
+  - override /callbacks: twi.yaml
+
+tags: ["twi_new", "akan", "finetune", "lfn_phonemizer", "early_stopping"]
+
+run_name: twi_new_finetune
+
+# Train until convergence; EarlyStopping will halt if val loss does not improve
+# for 5 consecutive epochs.
+trainer:
+  max_epochs: 500
+  check_val_every_n_epoch: 1
+
+# Same ~2s crop as the original Twi recipe.
+model:
+  out_size: 172

@@ -1,0 +1,25 @@
+_target_: matcha.data.text_mel_datamodule.TextMelDataModule
+name: twi_new
+# Filelists store "wav_path|ipa_phonemes" (phonemes precomputed offline with the lfn
+# espeak voice via matcha.text.cleaners.twi_cleaners), so training uses the cheap
+# pass-through cleaner instead of re-running espeak every epoch.
+train_filelist_path: /mnt/volume_d2wey28/data/twi_new/train.txt
+valid_filelist_path: /mnt/volume_d2wey28/data/twi_new/val.txt
+batch_size: 64
+num_workers: 8
+pin_memory: True
+cleaners: [twi_phonemes]
+add_blank: True
+n_spks: 1
+n_fft: 1024
+n_feats: 80
+sample_rate: 22050
+hop_length: 256
+win_length: 1024
+f_min: 0
+f_max: 8000
+data_statistics:  # Overridden at train time from /mnt/volume_d2wey28/data/twi_new/twi_new.json
+  mel_mean: -5.536622
+  mel_std: 2.116101
+seed: ${seed}
+load_durations: false

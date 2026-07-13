@@ -1,6 +1,8 @@
 defaults:
   - model_summary.yaml
   - rich_progress_bar.yaml
+  - early_stopping.yaml
+  - tf32.yaml
   - _self_
 
 # Like the default ModelCheckpoint, but every saved checkpoint is also pushed to the HF Hub.

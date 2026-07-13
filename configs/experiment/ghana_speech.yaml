@@ -1,0 +1,25 @@
+# @package _global_
+
+# Finetune Matcha-TTS on ghananlpcommunity/ghana-speech (all 42 language subsets)
+# with language tags repurposing the speaker-conditioning slot (n_spks=42).
+# Run on the H200 with early stopping (patience=5).
+#
+# Example:
+#   python matcha/train.py experiment=ghana_speech finetune_ckpt=/path/to/nano_twi_045.ckpt
+
+defaults:
+  - override /data: ghana_speech.yaml
+  - override /callbacks: twi.yaml
+
+tags: ["ghana_speech", "multilingual", "finetune", "lfn_phonemizer", "early_stopping"]
+
+run_name: ghana_speech_finetune
+
+# Train until convergence; EarlyStopping halts if val loss does not improve for 5 epochs.
+trainer:
+  max_epochs: 500
+  check_val_every_n_epoch: 1
+
+# Same ~2s crop as the Twi recipe.
+model:
+  out_size: 172

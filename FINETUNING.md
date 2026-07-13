@@ -107,7 +107,24 @@ Modal Volume). See `modal/README.md` for the commands.
 
 ---
 
-## 6. Notes
+## 6. H200 direct finetuning recipe (new dataset)
+
+For a second finetuning round on a new dataset (e.g. `ghananlpcommunity/new-twi-tts-aligned`) with the same hyperparameters and a Vocos vocoder, use the scripts in `scripts/`:
+
+1. **Environment** (once): `scripts/setup_h200.sh`
+2. **Data prep** (resumable): `scripts/run_data_prep.sh`
+3. **Matcha finetune** (early stopping patience=5):
+   ```bash
+   scripts/run_matcha_finetune.sh /path/to/your/twi_045.ckpt
+   ```
+4. **Vocos vocoder finetune** (early stopping patience=5):
+   ```bash
+   scripts/run_vocos_finetune.sh
+   ```
+
+The Matcha experiment config is `configs/experiment/twi_new.yaml`, the data config is `configs/data/twi_new.yaml`, and early stopping is enabled via `configs/callbacks/early_stopping.yaml` (monitors `loss/val`). The Vocoder base model defaults to `BSC-LT/vocos-mel-22khz`, whose mel parameters exactly match Matcha's.
+
+## 7. Notes
 
 - Matcha is **single-speaker, non-autoregressive** — no voice cloning, but very stable on long text.
 - The phonemizer (espeak-ng) is **embedded in sherpa-onnx** on every platform (desktop/Android/iOS/WASM);

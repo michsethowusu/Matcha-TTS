@@ -1,0 +1,23 @@
+_target_: matcha.data.text_mel_datamodule.TextMelDataModule
+name: ghana_speech
+# 3-field filelists: wav_path|lang_id|phonemes (lang_id repurposes the speaker slot).
+train_filelist_path: /mnt/volume_d2wey28/data/ghana_speech/train.txt
+valid_filelist_path: /mnt/volume_d2wey28/data/ghana_speech/val.txt
+batch_size: 64
+num_workers: 8
+pin_memory: True
+cleaners: [twi_phonemes]
+add_blank: True
+n_spks: 42
+n_fft: 1024
+n_feats: 80
+sample_rate: 22050
+hop_length: 256
+win_length: 1024
+f_min: 0
+f_max: 8000
+data_statistics:
+  mel_mean: -5.536622
+  mel_std: 2.116101
+seed: ${seed}
+load_durations: false
