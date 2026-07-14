@@ -21,6 +21,7 @@ import math
 import os
 import random
 import shutil
+import time
 from pathlib import Path
 
 import numpy as np
@@ -38,6 +39,20 @@ rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from matcha.text.cleaners import twi_cleaners
 from matcha.text.symbols import symbols
 from matcha.utils.audio import mel_spectrogram
+
+def _retry(fn, retries=5, backoff=30, label="operation"):
+    """Retry *fn()* up to *retries* times with exponential backoff."""
+    for attempt in range(1, retries + 1):
+        try:
+            return fn()
+        except Exception as e:
+            if attempt == retries:
+                print(f"[prep] {label} failed after {retries} attempts: {e}")
+                raise
+            wait = backoff * attempt
+            print(f"[prep] {label} attempt {attempt}/{retries} failed: {e}. Retrying in {wait}s...")
+            time.sleep(wait)
+
 
 SAMPLE_RATE = 22050
 N_FFT = 1024
@@ -146,7 +161,10 @@ def stage_prep(args):
 
     for subset in pending:
         print(f"\n[prep] === subset: {subset} (lang_id={lang_to_id[subset]}) ===")
-        ds = load_dataset(args.dataset, subset, split="train", streaming=args.streaming, **load_kwargs)
+        ds = _retry(
+            lambda s=subset: load_dataset(args.dataset, s, split="train", streaming=args.streaming, **load_kwargs),
+            retries=5, backoff=60, label=f"load_dataset({subset})",
+        )
         ds = ds.cast_column("audio", Audio(sampling_rate=SAMPLE_RATE))
 
         per_lang_path = per_lang_dir / f"{subset}.jsonl"
