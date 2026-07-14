@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Finetune Matcha-TTS from a previous Twi checkpoint on ghananlpcommunity/ghana-speech.
+# Uses filtered filelists (1-10s, 10h/lang cap).
 # Usage:
-#   export HF_TOKEN=hf_xxx
-#   export HF_REPO_ID=your/repo
 #   scripts/run_matcha_finetune_ghana.sh /path/to/nano_twi_045.ckpt
 set -euo pipefail
 
@@ -16,12 +15,13 @@ cd /mnt/volume_d2wey28/projects/matcha-twi
 source .venv/bin/activate
 export PYTHONPATH=/mnt/volume_d2wey28/projects/matcha-twi:$PYTHONPATH
 
-STATS=$(cat /mnt/volume_d2wey28/data/ghana_speech/ghana_speech.json)
+STATS=$(cat /mnt/volume_d2wey28/data/ghana_speech/ghana_speech_filtered.json)
 MEAN=$(echo "$STATS" | python -c "import sys,json; print(json.load(sys.stdin)['mel_mean'])")
 STD=$(echo "$STATS" | python -c "import sys,json; print(json.load(sys.stdin)['mel_std'])")
+N_TRAIN=$(echo "$STATS" | python -c "import sys,json; print(json.load(sys.stdin)['n_train'])")
 
 echo "[matcha-ft] finetuning from $FINETUNE_CKPT"
-echo "[matcha-ft] data stats: mean=$MEAN std=$STD"
+echo "[matcha-ft] filtered data: $N_TRAIN train clips, mean=$MEAN std=$STD"
 
 python matcha/train.py \
     experiment=ghana_speech \

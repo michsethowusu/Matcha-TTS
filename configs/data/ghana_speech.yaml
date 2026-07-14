@@ -1,8 +1,9 @@
 _target_: matcha.data.text_mel_datamodule.TextMelDataModule
 name: ghana_speech
 # 3-field filelists: wav_path|lang_id|phonemes (lang_id repurposes the speaker slot).
-train_filelist_path: /mnt/volume_d2wey28/data/ghana_speech/train.txt
-valid_filelist_path: /mnt/volume_d2wey28/data/ghana_speech/val.txt
+# Default to filtered filelists (1-10s, 10h/lang cap); run filter script first.
+train_filelist_path: /mnt/volume_d2wey28/data/ghana_speech/train_filtered.txt
+valid_filelist_path: /mnt/volume_d2wey28/data/ghana_speech/val_filtered.txt
 batch_size: 64
 num_workers: 8
 pin_memory: True
