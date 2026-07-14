@@ -19,7 +19,20 @@ if [ -n "${HF_TOKEN:-}" ]; then
 fi
 
 echo "[run_all] === Stage 1/3: data prep ==="
-scripts/run_data_prep_ghana.sh
+MAX_ATTEMPTS=5
+for attempt in $(seq 1 $MAX_ATTEMPTS); do
+    echo "[run_all] data prep attempt $attempt/$MAX_ATTEMPTS"
+    if scripts/run_data_prep_ghana.sh; then
+        echo "[run_all] data prep succeeded"
+        break
+    fi
+    if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+        echo "[run_all] data prep FAILED after $MAX_ATTEMPTS attempts"
+        exit 1
+    fi
+    echo "[run_all] data prep failed, retrying in 120s..."
+    sleep 120
+done
 
 echo "[run_all] === Stage 2/3: Matcha-TTS finetuning ==="
 scripts/run_matcha_finetune_ghana.sh "$FINETUNE_CKPT"
