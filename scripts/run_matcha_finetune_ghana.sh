@@ -13,7 +13,7 @@ fi
 
 cd /mnt/volume_d2wey28/projects/matcha-twi
 source .venv/bin/activate
-export PYTHONPATH=/mnt/volume_d2wey28/projects/matcha-twi:$PYTHONPATH
+export PYTHONPATH=/mnt/volume_d2wey28/projects/matcha-twi:${PYTHONPATH:-}
 
 STATS=$(cat /mnt/volume_d2wey28/data/ghana_speech/ghana_speech_filtered.json)
 MEAN=$(echo "$STATS" | python -c "import sys,json; print(json.load(sys.stdin)['mel_mean'])")
@@ -29,7 +29,7 @@ python matcha/train.py \
     data.data_statistics.mel_mean="$MEAN" \
     data.data_statistics.mel_std="$STD" \
     data.batch_size=64 \
-    data.num_workers=8 \
+    data.num_workers=16 \
     trainer.devices=[0] \
     trainer.precision=bf16-mixed \
     test=false

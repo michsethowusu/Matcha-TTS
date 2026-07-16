@@ -207,4 +207,10 @@ class BaseLightningClass(LightningModule, ABC):
                 )
 
     def on_before_optimizer_step(self, optimizer):
-        self.log_dict({f"grad_norm/{k}": v for k, v in grad_norm(self, norm_type=2).items()})
+        # Logging a per-parameter grad norm (305 scalars) every step pushes each through
+        # Lightning's metric machinery + TensorBoard and dominates step time (~35s/step on
+        # this model). Log only the aggregate 2-norm, which is cheap and sufficient.
+        norms = grad_norm(self, norm_type=2)
+        total_key = "grad_2.0_norm_total"
+        if total_key in norms:
+            self.log("grad_norm/total", norms[total_key])
