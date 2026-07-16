@@ -15,6 +15,13 @@ cd /mnt/volume_d2wey28/projects/matcha-twi
 source .venv/bin/activate
 export PYTHONPATH=/mnt/volume_d2wey28/projects/matcha-twi:${PYTHONPATH:-}
 
+# Push each epoch's checkpoint to this HF model repo (HF_TOKEN must be set in the
+# environment; it is intentionally not stored in this script).
+export HF_REPO_ID="${HF_REPO_ID:-ghananlpcommunity/ghana-speech-nano}"
+if [ -z "${HF_TOKEN:-}" ]; then
+    echo "[matcha-ft] WARNING: HF_TOKEN not set — checkpoints will NOT be pushed to the Hub."
+fi
+
 STATS=$(cat /mnt/volume_d2wey28/data/ghana_speech/ghana_speech_filtered.json)
 MEAN=$(echo "$STATS" | python -c "import sys,json; print(json.load(sys.stdin)['mel_mean'])")
 STD=$(echo "$STATS" | python -c "import sys,json; print(json.load(sys.stdin)['mel_std'])")
