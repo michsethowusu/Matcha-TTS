@@ -2,9 +2,12 @@
 
 early_stopping:
   _target_: lightning.pytorch.callbacks.EarlyStopping
-  monitor: loss/val # metric to monitor (logged by BaseLightningClass.validation_step)
+  # Monitor the flow-matching (acoustic) loss, not total val loss. Total val loss is ~98%
+  # duration loss, which is noisy and high-magnitude; monitoring it stopped training while
+  # audio quality (diff/prior loss) was still improving. diff loss tracks synthesis quality.
+  monitor: sub_loss/val_diff_loss # metric to monitor (logged by BaseLightningClass.validation_step)
   min_delta: 0.0 # minimum change to qualify as an improvement
-  patience: 5 # number of epochs with no improvement after which training will be stopped
+  patience: 10 # number of epochs with no improvement after which training will be stopped
   verbose: True
   mode: min # "min" means lower validation loss is better
   strict: True

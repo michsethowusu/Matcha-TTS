@@ -30,6 +30,15 @@ N_TRAIN=$(echo "$STATS" | python -c "import sys,json; print(json.load(sys.stdin)
 echo "[matcha-ft] finetuning from $FINETUNE_CKPT"
 echo "[matcha-ft] filtered data: $N_TRAIN train clips, mean=$MEAN std=$STD"
 
+# Optional full resume: set RESUME_CKPT to a Lightning checkpoint (e.g. last.ckpt) to
+# restore optimizer/epoch state via ckpt_path. When set, finetune_ckpt is ignored by
+# train.py (it only weight-loads when ckpt_path is absent).
+RESUME_ARG=()
+if [ -n "${RESUME_CKPT:-}" ]; then
+    echo "[matcha-ft] RESUMING training from $RESUME_CKPT"
+    RESUME_ARG=(ckpt_path="$RESUME_CKPT")
+fi
+
 python matcha/train.py \
     experiment=ghana_speech \
     finetune_ckpt="$FINETUNE_CKPT" \
@@ -39,6 +48,7 @@ python matcha/train.py \
     data.num_workers=16 \
     trainer.devices=[0] \
     trainer.precision=bf16-mixed \
-    test=false
+    test=false \
+    "${RESUME_ARG[@]}"
 
 echo "[matcha-ft] done"
