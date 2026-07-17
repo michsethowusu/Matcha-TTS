@@ -17,8 +17,11 @@ hop_length: 256
 win_length: 1024
 f_min: 0
 f_max: 8000
+# Stats for the re-filtered set (min 3s, random cap to 20h/lang). The model inherits these
+# via ${data.data_statistics}, so its mel_mean/mel_std buffers match the normalization the
+# data is trained with (important: synthesise() denormalizes with these buffers).
 data_statistics:
-  mel_mean: -5.536622
-  mel_std: 2.116101
+  mel_mean: -5.670213434000389
+  mel_std: 3.317951496927415
 seed: ${seed}
 load_durations: false

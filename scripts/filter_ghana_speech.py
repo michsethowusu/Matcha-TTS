@@ -20,6 +20,7 @@ Usage:
 """
 import argparse
 import json
+import random
 import sys
 import time
 from collections import defaultdict
@@ -45,11 +46,17 @@ def parse_filelist(path):
 
 
 def get_duration(item):
+    # Derive duration from the precomputed mel frame count (frames * hop / sr) rather than
+    # the wav header: the 22.05kHz wavs referenced by the filelist may no longer exist (only
+    # wavs_16k + mels remain), and the mel length is exactly what the model trains on.
     wav_path, lang_id, phonemes = item
     try:
-        info = sf.info(wav_path)
-        return (wav_path, lang_id, phonemes, info.duration)
-    except Exception as e:
+        stem = Path(wav_path).stem
+        mel_path = Path(wav_path).parent.parent / "mels" / (stem + ".npy")
+        frames = np.load(mel_path, mmap_mode="r").shape[1]
+        dur = frames * 256 / 22050  # hop_length=256, sample_rate=22050
+        return (wav_path, lang_id, phonemes, dur)
+    except Exception:
         return (wav_path, lang_id, phonemes, None)
 
 
@@ -118,19 +125,24 @@ def main():
 
     print(f"[filter] Languages with qualifying clips: {len(by_lang)}")
 
-    # Sort each language by duration (shortest first), then cap
+    # Select a RANDOM sample per language up to the cap (NOT shortest-first). Shortest-first
+    # caused capped high-resource languages to train only on 1-2s fragments, which produced
+    # poor duration/prosody. A random sample preserves each language's natural mix of clip
+    # lengths (like the under-cap languages that trained well).
+    rng = random.Random(1234)
     val_clips = []
     train_clips = []
     lang_stats = {}
 
     for lang_id in sorted(by_lang.keys(), key=int):
-        clips = sorted(by_lang[lang_id], key=lambda x: x[3])
+        clips = list(by_lang[lang_id])
+        rng.shuffle(clips)
 
-        # First val_per_lang go to validation (shortest, most uniform)
+        # First val_per_lang (from the shuffle) go to validation — a representative sample.
         n_val = min(args.val_per_lang, len(clips))
         val_clips.extend(clips[:n_val])
 
-        # Remaining go to training, capped at max_secs
+        # Remaining go to training in shuffled order, capped at max_secs total duration.
         remaining = clips[n_val:]
         cumsum = 0
         kept = []
