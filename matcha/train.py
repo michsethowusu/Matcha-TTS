@@ -89,9 +89,26 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         compatible = {}
         skipped_shapes = []
         for k, v in state_dict.items():
+            # Never inherit the base checkpoint's mel_mean/mel_std buffers: they belong to the
+            # base model's training data. Keep the ones this model was built with (from the
+            # data config), so synthesise() denormalizes with the correct stats.
+            if k.endswith("mel_mean") or k.endswith("mel_std"):
+                continue
             if k in model_state:
                 if v.shape == model_state[k].shape:
                     compatible[k] = v
+                elif (
+                    k == "encoder.emb.weight"
+                    and v.dim() == 2
+                    and v.shape[1] == model_state[k].shape[1]
+                    and v.shape[0] <= model_state[k].shape[0]
+                ):
+                    # Text-embedding table grew (added language tokens). Keep the pretrained
+                    # rows; the extra rows stay at their fresh init from model_state.
+                    merged = model_state[k].clone()
+                    merged[: v.shape[0]] = v
+                    compatible[k] = merged
+                    log.info(f"Finetune load: partial-copied {k} {tuple(v.shape)} -> {tuple(model_state[k].shape)}")
                 else:
                     skipped_shapes.append(k)
             else:

@@ -10,6 +10,7 @@ from lightning import LightningDataModule
 from torch.utils.data.dataloader import DataLoader
 
 from matcha.text import text_to_sequence
+from matcha.text.symbols import lang_token_id
 from matcha.utils.audio import mel_spectrogram
 from matcha.utils.model import fix_len_compatibility, normalize
 from matcha.utils.utils import intersperse
@@ -176,6 +177,13 @@ class TextMelDataset(torch.utils.data.Dataset):
             spk = None
 
         text, cleaned_text = self.get_text(text, add_blank=self.add_blank)
+
+        # Prepend the language token id so the encoder sees language in the input sequence
+        # itself (disambiguates phonetically-similar languages), in addition to the speaker
+        # embedding tag. Injected by id — the char-level tokenizer never matches it.
+        if spk is not None:
+            text = torch.cat([torch.IntTensor([lang_token_id(spk)]), text])
+
         mel = self.get_mel(filepath)
 
         durations = self.get_durations(filepath, text) if self.load_durations else None
