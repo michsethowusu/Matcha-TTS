@@ -95,10 +95,18 @@ def main():
     p.add_argument("--pretrained", default="BSC-LT/vocos-mel-22khz")
     p.add_argument("--segment-frames", type=int, default=64)
     p.add_argument("--batch-size", type=int, default=32)
-    p.add_argument("--lr", type=float, default=2e-4)
+    p.add_argument("--lr", type=float, default=5e-5,
+                   help="Lower than from-scratch (2e-4): finetuning a pretrained generator with "
+                        "fresh discriminators is unstable at high LR.")
+    p.add_argument("--warmup-epochs", type=int, default=2,
+                   help="Mel-only generator warmup (no discriminator) before adversarial training, "
+                        "so the pretrained generator adapts before the GAN dynamics start.")
     p.add_argument("--max-epochs", type=int, default=200)
     p.add_argument("--patience", type=int, default=10)
     p.add_argument("--mel-coeff", type=float, default=45.0)
+    p.add_argument("--init-best", type=float, default=float("inf"),
+                   help="Seed the best val mel-L1 (e.g. a prior run's best) so checkpoints are only "
+                        "saved/pushed when they beat it — avoids regressing a good HF checkpoint.")
     p.add_argument("--num-workers", type=int, default=8)
     p.add_argument("--smoke", type=int, default=0, help="if >0, run only N train steps + tiny val and exit")
     a = p.parse_args()
@@ -151,34 +159,44 @@ def main():
         backbone.train(); head.train()
         return tot / max(n, 1)
 
-    best, wait, step = float("inf"), 0, 0
+    best, wait, step = a.init_best, 0, 0
     for epoch in range(a.max_epochs):
         backbone.train(); head.train(); mpd.train(); mrd.train()
+        adversarial = epoch >= a.warmup_epochs  # mel-only warmup first, then GAN
         for mel, audio in tr:
             mel, audio = mel.to(device), audio.to(device)
             yh = gen(mel).squeeze(1)  # (B, seg*HOP)
 
-            # ---- discriminator ----
-            opt_d.zero_grad(set_to_none=True)
-            r_mpd, g_mpd, _, _ = mpd(audio, yh.detach())
-            r_mrd, g_mrd, _, _ = mrd(audio, yh.detach())
-            l_d = disc_loss(r_mpd, g_mpd)[0] + disc_loss(r_mrd, g_mrd)[0]
-            l_d.backward(); opt_d.step()
+            if adversarial:
+                # ---- discriminator ----
+                opt_d.zero_grad(set_to_none=True)
+                r_mpd, g_mpd, _, _ = mpd(audio, yh.detach())
+                r_mrd, g_mrd, _, _ = mrd(audio, yh.detach())
+                l_d = disc_loss(r_mpd, g_mpd)[0] + disc_loss(r_mrd, g_mrd)[0]
+                l_d.backward(); opt_d.step()
 
-            # ---- generator ----
-            opt_g.zero_grad(set_to_none=True)
-            r_mpd, g_mpd, fr_mpd, fg_mpd = mpd(audio, yh)
-            r_mrd, g_mrd, fr_mrd, fg_mrd = mrd(audio, yh)
-            l_adv = gen_loss(g_mpd)[0] + gen_loss(g_mrd)[0]
-            l_fm = fm_loss(fr_mpd, fg_mpd) + fm_loss(fr_mrd, fg_mrd)
-            l_mel = mel_loss(yh, audio)
-            l_g = l_adv + l_fm + a.mel_coeff * l_mel
-            l_g.backward(); opt_g.step()
+                # ---- generator (adversarial + feature-matching + mel) ----
+                opt_g.zero_grad(set_to_none=True)
+                r_mpd, g_mpd, fr_mpd, fg_mpd = mpd(audio, yh)
+                r_mrd, g_mrd, fr_mrd, fg_mrd = mrd(audio, yh)
+                l_adv = gen_loss(g_mpd)[0] + gen_loss(g_mrd)[0]
+                l_fm = fm_loss(fr_mpd, fg_mpd) + fm_loss(fr_mrd, fg_mrd)
+                l_mel = mel_loss(yh, audio)
+                l_g = l_adv + l_fm + a.mel_coeff * l_mel
+                l_g.backward(); opt_g.step()
+            else:
+                # ---- warmup: generator on mel reconstruction only, discriminators idle ----
+                opt_g.zero_grad(set_to_none=True)
+                l_mel = mel_loss(yh, audio)
+                l_g = a.mel_coeff * l_mel
+                l_g.backward(); opt_g.step()
+                l_adv = l_fm = l_d = torch.zeros((), device=device)
 
             step += 1
             if step % 50 == 0:
-                print(f"[vocos-ft] e{epoch} step {step}: mel={l_mel.item():.3f} adv={l_adv.item():.3f} "
-                      f"fm={l_fm.item():.3f} d={l_d.item():.3f}", flush=True)
+                tag = "GAN" if adversarial else "warmup"
+                print(f"[vocos-ft] e{epoch}({tag}) step {step}: mel={l_mel.item():.3f} "
+                      f"adv={float(l_adv):.3f} fm={float(l_fm):.3f} d={float(l_d):.3f}", flush=True)
             if a.smoke and step >= a.smoke:
                 v = validate()
                 print(f"[vocos-ft] SMOKE ok: {step} steps, val mel-L1={v:.3f}", flush=True)
