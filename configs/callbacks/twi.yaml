@@ -14,13 +14,13 @@ model_checkpoint:
   private: true
   dirpath: ${paths.output_dir}/checkpoints
   filename: twi_{epoch:03d}
-  # Keep EVERY epoch's checkpoint (save_top_k=-1): nothing is pruned locally or on the Hub, so
-  # we can pick any epoch afterwards. monitor is kept only to label the best in logs.
+  # Keep the BEST checkpoints by validation flow-matching loss (not just the latest epochs), so
+  # the true best model is retained rather than the early-stopping patience tail.
   monitor: sub_loss/val_diff_loss
   mode: min
   verbose: false
   save_last: true        # checkpoints/last.ckpt — always the final epoch
-  save_top_k: -1         # keep ALL epoch checkpoints (no deletion, local + mirrored on HF)
+  save_top_k: 5          # keep the 5 BEST-by-val-diff snapshots (local + mirrored on HF)
   every_n_epochs: 1      # save + push every epoch so HF updates frequently "as we go"
   save_weights_only: false
   every_n_train_steps: null
