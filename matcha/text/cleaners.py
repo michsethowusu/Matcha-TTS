@@ -152,6 +152,19 @@ def twi_phonemes(text):
     return collapse_whitespace(text)
 
 
+def graphemes(text):
+    """Orthographic (grapheme) cleaner: NFC-normalize, lowercase, collapse whitespace, and drop
+    any character not in the model's symbol table. Uses the native spelling directly instead of
+    espeak-lfn phonemization (these languages have shallow/phonemic orthographies)."""
+    import unicodedata
+    from matcha.text.symbols import symbols as _symbols
+
+    keep = set(_symbols)
+    text = unicodedata.normalize("NFC", text).lower()
+    text = collapse_whitespace(text)
+    return "".join(ch for ch in text if ch == " " or ch in keep)
+
+
 def ipa_simplifier(text):
     replacements = [
         ("ɐ", "ə"),

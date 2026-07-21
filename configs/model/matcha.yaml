@@ -6,7 +6,7 @@ defaults:
   - optimizer: adam.yaml
 
 _target_: matcha.models.matcha_tts.MatchaTTS
-n_vocab: 220  # 178 base symbols + 42 language tokens (see matcha/text/symbols.py)
+n_vocab: 284  # 178 base + 42 language tokens + 64 grapheme (orthographic) chars
 n_spks: ${data.n_spks}
 spk_emb_dim: 64
 n_feats: 80
